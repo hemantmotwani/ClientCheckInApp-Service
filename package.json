@@ -1,5 +1,5 @@
 {
-  "name": "client-checkin-server",
+  "name": "ClientCheckInApp-Service",
   "version": "1.0.0",
   "description": "Server for client check-in system",
   "main": "dist/index.js",

@@ -12,11 +12,11 @@ console.log("Client_url", process.env.CLIENT_URL);
 // CORS configuration
 app.use(cors({
   origin: [
-    'http://localhost:5173',
-    'https://client-checkin-app.vercel.app',
-    'https://*.vercel.app',
-    '*',
-    process.env.CLIENT_URL || 'http://localhost:5173'
+    // 'http://localhost:5173',
+    // 'https://client-checkin-app.vercel.app',
+    // 'https://*.vercel.app',
+    '*'
+    // process.env.CLIENT_URL || 'http://localhost:5173'
   ].filter(Boolean),
   credentials: true
 }));
@@ -87,3 +87,4 @@ app.get('/api/data', (req, res) => {
 export default async (req: express.Request, res: express.Response) => {
   await app(req, res);
 };
+
