@@ -9,12 +9,12 @@ import firebaseAdmin from 'firebase-admin';
 
 
 // Debug logs for environment variables
-console.log('Checking Firebase environment variables:');
-console.log('FIREBASE_PROJECT_ID:', process.env.FIREBASE_PROJECT_ID);
-console.log('FIREBASE_PRIVATE_KEY_ID:', process.env.FIREBASE_PRIVATE_KEY_ID);
-console.log('FIREBASE_CLIENT_EMAIL:', process.env.FIREBASE_CLIENT_EMAIL);
-console.log('FIREBASE_CLIENT_ID:', process.env.FIREBASE_CLIENT_ID);
-console.log('FIREBASE_DATABASE_URL:', process.env.FIREBASE_DATABASE_URL);
+console.warn('Checking Firebase environment variables:');
+console.warn('FIREBASE_PROJECT_ID:', process.env.FIREBASE_PROJECT_ID);
+console.warn('FIREBASE_PRIVATE_KEY_ID:', process.env.FIREBASE_PRIVATE_KEY_ID);
+console.warn('FIREBASE_CLIENT_EMAIL:', process.env.FIREBASE_CLIENT_EMAIL);
+console.warn('FIREBASE_CLIENT_ID:', process.env.FIREBASE_CLIENT_ID);
+console.warn('FIREBASE_DATABASE_URL:', process.env.FIREBASE_DATABASE_URL);
 
 if (!process.env.FIREBASE_PROJECT_ID) {
   throw new Error('FIREBASE_PROJECT_ID is not defined in environment variables');
