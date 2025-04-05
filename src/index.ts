@@ -9,18 +9,41 @@ import clientRoutes from './routes/clientRoutes';
 const app = express();
 const port = process.env.PORT || 3001;
 console.log("Client_url", process.env.CLIENT_URL);
-// CORS configuration
+
+// Approved domains (add more as needed)
+const allowedOrigins = [
+  'http://localhost:5173', // Local development
+  'https://client-check-in-app-ui.vercel.app', // Your frontend
+  process.env.CLIENT_URL || 'http://localhost:5173' // Fallback
+];
+
 app.use(cors({
-  origin: [
-    // 'http://localhost:5173',
-    // 'https://client-checkin-app.vercel.app',
-    // 'https://*.vercel.app',
-    '*'
-    // process.env.CLIENT_URL || 'http://localhost:5173'
-  ].filter(Boolean),
-  credentials: true
+  origin: (origin, callback) => {
+    console.log('Origin:', origin); // Log the origin.toLowerCase
+    // Allow requests with no origin (mobile apps, curl, etc)
+    if (!origin) return callback(null, true);
+    
+    const isAllowed = allowedOrigins.some(allowedOrigin => 
+      origin.toLowerCase() === allowedOrigin.toLowerCase()
+    );
+    isAllowed 
+    ? callback(null, true)
+    : callback(new Error(`Origin ${origin} not allowed`));
+    
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+// Explicitly handle preflight requests
+app.options('*', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.status(204).end();
+});
 // Request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
