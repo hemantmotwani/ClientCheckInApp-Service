@@ -76,7 +76,14 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 //   console.log(`[Server] Firebase Project: ${process.env.FIREBASE_PROJECT_ID}`);
 //   console.log('=================================');
 // }); 
-export default app;
+// export default app;
 module.exports = (req: express.Request, res: express.Response) => {
   app(req, res);
+};
+app.get('/api/data', (req, res) => {
+  res.json({ message: "Working!" });
+});
+// Vercel-specific export
+export default async (req: express.Request, res: express.Response) => {
+  await app(req, res);
 };
