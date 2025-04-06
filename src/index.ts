@@ -131,6 +131,12 @@ app.use(
     },
   })
 );
+app.use((req, res, next) => {
+  console.log("=== Session Middleware ===");
+  console.log("req.sessionID:", req.sessionID); // Log the session ID
+  console.log("req.path", req.path);
+  next();
+});
 // Passport initialization
 app.use(passport.initialize());
 app.use(passport.session());
