@@ -20,6 +20,7 @@ declare global {
   }
 }
 const app = express();
+const V_CLIENT_URL = process.env.CLIENT_URL;
 console.log("Client_url", process.env.CLIENT_URL);
 
 // Approved domains (add more as needed)
@@ -49,13 +50,23 @@ app.use(cors({
 }));
 
 // Explicitly handle preflight requests
-app.options('*', (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.status(204).end();
-});
+// app.options('*', (req, res) => {
+//   res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+//   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+//   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+//   res.setHeader('Access-Control-Allow-Credentials', 'true');
+//   res.status(204).end();
+// });
+app.options('*', cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.some(o => origin.toLowerCase() === o.toLowerCase())) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
 // Request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
@@ -148,7 +159,7 @@ app.get(
   "/auth/google/callback",
   passport.authenticate("google", { failureRedirect: "/login" }),
   (req: Request, res: Response) => {
-    res.redirect("http://localhost:5173");
+    res.redirect(`${V_CLIENT_URL}`);
   }
 );
 
