@@ -89,7 +89,8 @@ app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} - ${res.statusCode} (${duration}ms)`);
     console.log('=== End Request ===\n');
   });
-  
+  res.header('Vary', 'Origin'); // Important for cache control
+
   next();
 });
 
