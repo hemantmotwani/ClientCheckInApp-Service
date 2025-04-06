@@ -5,17 +5,29 @@ dotenv.config();
 import express from 'express';
 import cors from 'cors';
 import clientRoutes from './routes/clientRoutes';
+import session from "express-session";
+import passport from "passport";
+import { Strategy as GoogleStrategy } from "passport-google-oauth20";
+import { Request, Response } from "express";
 
+declare global {
+  namespace Express {
+    interface User {
+      id: string;
+      name: string;
+      email: string;
+    }
+  }
+}
 const app = express();
-const port = process.env.PORT || 3001;
 console.log("Client_url", process.env.CLIENT_URL);
 
 // Approved domains (add more as needed)
 const allowedOrigins = [
   'http://localhost:5173', // Local development
   'https://client-check-in-app-ui.vercel.app', // Your frontend
-  process.env.CLIENT_URL || 'http://localhost:5173' // Fallback
-];
+  process.env.CLIENT_URL || '' // Fallback
+].filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -89,17 +101,79 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
   res.status(500).json({ error: 'Internal server error' });
 });
 
+// Session configuration
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET!,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      sameSite: "lax",
+    },
+  })
+);
+// Passport initialization
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Google OIDC strategy
+passport.use(
+  new GoogleStrategy(
+    {
+      clientID: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      callbackURL: process.env.GOOGLE_CALLBACK_URL!,
+      scope: ["openid", "email", "profile"],
+    },
+    (accessToken, refreshToken, profile, done) => {
+      const user: Express.User = {
+        id: profile.id,
+        name: profile.displayName || 'Guest',
+        email: profile.emails?.[0].value || "",
+      };
+      done(null, user);
+    }
+  )
+);
+
+// Serialize/deserialize user
+passport.serializeUser((user, done) => done(null, user));
+passport.deserializeUser((user: Express.User, done) => done(null, user));
+
+// Routes
+app.get("/auth/google", passport.authenticate("google"));
+app.get(
+  "/auth/google/callback",
+  passport.authenticate("google", { failureRedirect: "/login" }),
+  (req: Request, res: Response) => {
+    res.redirect("http://localhost:5173");
+  }
+);
+
+app.get("/auth/status", (req: Request, res: Response) => {
+  res.json({ isAuthenticated: req.isAuthenticated(), user: req.user });
+});
+
+// Add this to your Express routes
+app.post("/auth/logout", (req: Request, res: Response)  => {
+  req.logout((err) => {
+    if (err) {
+      console.error('Logout error:', err);
+      return res.status(500).send('Logout failed');
+    }
+    req.session.destroy(() => {
+      res.clearCookie('connect.sid'); // Clear session cookie
+      res.sendStatus(200);
+    });
+  });
+});
 // Start server
-// app.listen(port, () => {
-//   console.log('=================================');
-//   console.log(`[Server] Starting up...`);
-//   console.log(`[Server] Environment: ${process.env.NODE_ENV || 'development'}`);
-//   console.log(`[Server] Port: ${port}`);
-//   console.log(`[Server] CORS: Enabled (allowing all origins in development)`);
-//   console.log(`[Server] Firebase Project: ${process.env.FIREBASE_PROJECT_ID}`);
-//   console.log('=================================');
-// }); 
-// export default app;
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
 module.exports = (req: express.Request, res: express.Response) => {
   app(req, res);
 };

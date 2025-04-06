@@ -71,7 +71,7 @@ export const checkInClient = async (barcode: string) => {
     };
 
     console.log(`[Database] Creating check-in record: ${JSON.stringify(client_checkin_data, null, 2)}`);
-    await db.collection('Client_CheckIns').doc(client_checkin_data.client_Id).set(client_checkin_data);    
+    await db.collection('Client_CheckIns').doc(client_checkin_data.checkin_Id).set(client_checkin_data);    
     // const checkInsRef = db.ref('checkIns');
     // await checkInsRef.child(timestamp).set(checkInData);
     
