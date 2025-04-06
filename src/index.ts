@@ -27,21 +27,18 @@ console.log("Client_url", process.env.CLIENT_URL);
 const allowedOrigins = [
   'http://localhost:5173', // Local development
   'https://client-check-in-app-ui.vercel.app', // Your frontend
-  process.env.CLIENT_URL || '' // Fallback
+  ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : []) // Fallback
 ].filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
     console.log('Origin:', origin); // Log the origin.toLowerCase
     // Allow requests with no origin (mobile apps, curl, etc)
-    if (!origin) return callback(null, true);
-    
-    const isAllowed = allowedOrigins.some(allowedOrigin => 
-      origin.toLowerCase() === allowedOrigin.toLowerCase()
-    );
-    isAllowed 
-    ? callback(null, true)
-    : callback(new Error(`Origin ${origin} not allowed`));
+    if (!origin || allowedOrigins.includes(origin.toLowerCase())) {
+      callback(null, true);
+    } else {
+      callback(new Error(`Origin ${origin} not allowed`));
+    }
     
   },
   credentials: true,
