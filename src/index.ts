@@ -28,7 +28,7 @@ const allowedOrigins = [
   'http://localhost:5173', // Local development
   'https://client-check-in-app-ui.vercel.app', // Your frontend
   ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : []) // Fallback
-].filter(Boolean);
+].filter(Boolean).map(url => url.toLowerCase());;
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -54,16 +54,16 @@ app.use(cors({
 //   res.setHeader('Access-Control-Allow-Credentials', 'true');
 //   res.status(204).end();
 // });
-app.options('*', cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.some(o => origin.toLowerCase() === o.toLowerCase())) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true
-}));
+// app.options('*', cors({
+//   origin: (origin, callback) => {
+//     if (!origin || allowedOrigins.some(o => origin.toLowerCase() === o.toLowerCase())) {
+//       callback(null, true);
+//     } else {
+//       callback(new Error('Not allowed by CORS'));
+//     }
+//   },
+//   credentials: true
+// }));
 // Request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
@@ -150,7 +150,7 @@ passport.use(
 // Serialize/deserialize user
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((user: Express.User, done) => done(null, user));
-
+console.log('V_CLIENT_URL:', V_CLIENT_URL);
 // Routes
 app.get("/auth/google", passport.authenticate("google"));
 app.get(
@@ -162,7 +162,13 @@ app.get(
 );
 
 app.get("/auth/status", (req: Request, res: Response) => {
-  res.json({ isAuthenticated: req.isAuthenticated(), user: req.user });
+  try {
+      console.log("auth/status called", req.isAuthenticated(), req.user);
+      res.json({ isAuthenticated: req.isAuthenticated(), user: req.user });
+  } catch (error) {
+      console.error("Error in /auth/status:", error);
+      res.status(500).json({ error: "Internal Server Error" }); // Explicitly handle the error
+  }
 });
 
 // Add this to your Express routes
