@@ -8,7 +8,7 @@ import clientRoutes from './routes/clientRoutes';
 import session from "express-session";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 
 declare global {
   namespace Express {
@@ -19,6 +19,14 @@ declare global {
     }
   }
 }
+
+declare module 'express-session' {
+  interface SessionData { // changed from Session to SessionData
+      loggedIn?: boolean;  // mark these as optional, otherwise you'll have to define them everywhere
+      user?: Express.User; //  Use the Express.User interface
+  }
+}
+
 const app = express();
 const V_CLIENT_URL = process.env.CLIENT_URL;
 console.log("Client_url", process.env.CLIENT_URL);
@@ -157,6 +165,12 @@ app.get(
   "/auth/google/callback",
   passport.authenticate("google", { failureRedirect: "/login" }),
   (req: Request, res: Response) => {
+    console.log("=== /auth/google/callback ===");
+    console.log("req.user:", req.user);
+    console.log("Before session:", req.session);
+    req.session.user = req.user;
+    req.session.loggedIn = true;
+    console.log("After session:", req.session);
     res.redirect(`${V_CLIENT_URL}`);
   }
 );
