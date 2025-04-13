@@ -14,6 +14,8 @@ import { requireRole } from './middleware/rbac';
 import {getCheckInsController} from './controllers/clientController';
 import { adminRateLimiter, staffRateLimiter } from './middleware/ratelimiter'; 
 import cors, { CorsOptions } from 'cors';
+import { redisStore, redisClient } from './config/redis'; // <-- Import from new file
+
 
 declare global {
   namespace Express {
@@ -117,6 +119,7 @@ app.get('/api/health', (req, res) => {
 // Session configuration
 app.use(
   session({
+    store: redisStore, // <-- Use the imported store
     secret: process.env.SESSION_SECRET!,
     resave: false,
     saveUninitialized: false,
@@ -261,11 +264,30 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
   console.error('Stack trace:', err.stack);
   res.status(500).json({ error: 'Internal server error' });
 });
+
+const gracefulShutdown = async (signal: string) => {
+  console.log(`Received ${signal}. Closing Redis connection...`);
+  try {
+    await redisClient.quit(); // <-- Use the imported client
+    console.log('Redis connection closed.');
+    process.exit(0);
+  } catch (err) {
+    console.error('Error closing Redis connection:', err);
+    process.exit(1);
+  }
+};
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
 // Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Redis client connected: ${redisClient.isReady}`);
 });
+
+
 module.exports = (req: express.Request, res: express.Response) => {
   app(req, res);
 };
@@ -274,6 +296,10 @@ app.get('/api/data', (req, res) => {
 });
 // Vercel-specific export
 export default async (req: express.Request, res: express.Response) => {
+  if (!redisClient.isReady) {
+    console.warn('Vercel function invoked but Redis not ready.');
+  
+  }  
   await app(req, res);
 };
 
