@@ -37,6 +37,8 @@ declare module 'express-session' {
 }
 
 const app = express();
+app.set('trust proxy', 1);
+
 const V_CLIENT_URL = process.env.CLIENT_URL;
 console.log("Client_url", process.env.CLIENT_URL);
 
@@ -126,7 +128,8 @@ app.use(
     cookie: {
       secure: process.env.NODE_ENV === "production",
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      maxAge: 1000 * 60 * 60 * 24,
     },
   })
 );
