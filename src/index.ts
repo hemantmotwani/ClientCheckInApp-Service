@@ -3,12 +3,17 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import express from 'express';
-import cors from 'cors';
 import clientRoutes from './routes/clientRoutes';
 import session from "express-session";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { Request, Response, NextFunction } from "express";
+import { Role } from './types/roles';
+import { requireRole } from './middleware/rbac';
+
+import {getCheckInsController} from './controllers/clientController';
+import { adminRateLimiter, staffRateLimiter } from './middleware/ratelimiter'; 
+import cors, { CorsOptions } from 'cors';
 
 declare global {
   namespace Express {
@@ -16,6 +21,8 @@ declare global {
       id: string;
       name: string;
       email: string;
+      roles: Role[]; 
+      activeRole?: Role;      
     }
   }
 }
@@ -38,40 +45,38 @@ const allowedOrigins = [
   ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : []) // Fallback
 ].filter(Boolean).map(url => url.toLowerCase());;
 
-app.use(cors({
+
+// --- Define CORS options ---
+const corsOptions: CorsOptions = {
   origin: (origin, callback) => {
-    console.log('Origin:', origin); // Log the origin.toLowerCase
-    // Allow requests with no origin (mobile apps, curl, etc)
-    if (!origin || allowedOrigins.includes(origin.toLowerCase())) {
+    const requestOrigin = origin?.toLowerCase(); // Handle potential undefined origin
+    console.log('CORS Check - Request Origin:', requestOrigin);
+    console.log('CORS Check - Allowed Origins:', allowedOrigins);
+    // Allow requests with no origin OR if origin is in the allowed list
+    if (!requestOrigin || allowedOrigins.includes(requestOrigin)) {
+      console.log('CORS Check - Allowed:', requestOrigin);
       callback(null, true);
     } else {
-      callback(new Error(`Origin ${origin} not allowed`));
+      console.error(`CORS Check - Blocked: ${origin}`); // Log blocked origins clearly
+      callback(new Error(`Origin ${origin} not allowed by CORS`));
     }
-    
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Ensure OPTIONS is included
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control'], // Ensure Cache-Control is here
+};
+// --- End Define CORS options ---
 
-// Explicitly handle preflight requests
-// app.options('*', (req, res) => {
-//   res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-//   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-//   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-//   res.setHeader('Access-Control-Allow-Credentials', 'true');
-//   res.status(204).end();
-// });
-// app.options('*', cors({
-//   origin: (origin, callback) => {
-//     if (!origin || allowedOrigins.some(o => origin.toLowerCase() === o.toLowerCase())) {
-//       callback(null, true);
-//     } else {
-//       callback(new Error('Not allowed by CORS'));
-//     }
-//   },
-//   credentials: true
-// }));
+// --- Explicitly handle OPTIONS requests first ---
+// This ensures preflight requests are handled correctly before other middleware/routes.
+app.options('*', cors(corsOptions));
+// --- End Explicit OPTIONS handler ---
+
+// --- Apply CORS to all subsequent requests ---
+app.use(cors(corsOptions));
+// --- End Apply CORS ---
+
+
 // Request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
@@ -108,15 +113,6 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// API routes
-app.use('/api', clientRoutes);
-
-// Error handling middleware
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('[Error] Unhandled error:', err);
-  console.error('Stack trace:', err.stack);
-  res.status(500).json({ error: 'Internal server error' });
-});
 
 // Session configuration
 app.use(
@@ -141,8 +137,29 @@ app.use((req, res, next) => {
 app.use(passport.initialize());
 app.use(passport.session());
 
+const getRoles = (email: string): Role[] => {
+  const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || [];
+  const staffEmails = process.env.STAFF_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || [];
+  const volunteerEmails = process.env.VOLUNTEER_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || [];
+
+  const assignedRoles: Role[] = [];
+  const lowerCaseEmail = email.toLowerCase();
+  // Check for roles hierarchically and add all applicable ones
+  if (adminEmails.includes(lowerCaseEmail)) {
+    assignedRoles.push(Role.ADMIN, Role.STAFF, Role.VOLUNTEER);
+  } else if (staffEmails.includes(lowerCaseEmail)) {
+    assignedRoles.push(Role.STAFF, Role.VOLUNTEER);
+  } else if (volunteerEmails.includes(lowerCaseEmail)) {
+    assignedRoles.push(Role.VOLUNTEER);
+  }
+
+
+  return assignedRoles;
+};
+
 // Google OIDC strategy
 passport.use(
+  
   new GoogleStrategy(
     {
       clientID: process.env.GOOGLE_CLIENT_ID!,
@@ -151,14 +168,32 @@ passport.use(
       scope: ["openid", "email", "profile"],
     },
     (accessToken, refreshToken, profile, done) => {
+      const email = profile.emails?.[0].value || "";
+      const roles = email ? getRoles(email) : [];
+
+      // --- Determine a default active role ---
+      let defaultActiveRole: Role | undefined = undefined;
+      if (roles.includes(Role.ADMIN)) {
+        defaultActiveRole = Role.ADMIN;
+      } else if (roles.includes(Role.STAFF)) {
+        defaultActiveRole = Role.STAFF;
+      } else if (roles.includes(Role.VOLUNTEER)) {
+        // Only set Volunteer if it's the only role or highest available
+        defaultActiveRole = Role.VOLUNTEER;
+      }
+      // --- End Determine default active role ---
+
       const user: Express.User = {
         id: profile.id,
         name: profile.displayName || 'Guest',
-        email: profile.emails?.[0].value || "",
+        email: email,
+        roles: roles,
+        activeRole: defaultActiveRole // <-- Assign the determined role here
       };
-      done(null, user);
+      done(null, user); // Pass the user object with activeRole to Passport
     }
   )
+  
 );
 
 // Serialize/deserialize user
@@ -203,6 +238,28 @@ app.post("/auth/logout", (req: Request, res: Response)  => {
       res.sendStatus(200);
     });
   });
+});
+
+app.get('/api/dashboard/check-ins',
+  adminRateLimiter,
+  requireRole(Role.ADMIN), 
+  getCheckInsController      
+);
+
+// API routes
+app.use('/api', 
+  staffRateLimiter, 
+  requireRole(Role.VOLUNTEER), 
+  clientRoutes
+);
+
+
+
+// Error handling middleware
+app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('[Error] Unhandled error:', err);
+  console.error('Stack trace:', err.stack);
+  res.status(500).json({ error: 'Internal server error' });
 });
 // Start server
 const PORT = process.env.PORT || 5000;

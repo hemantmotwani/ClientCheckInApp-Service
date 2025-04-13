@@ -1,5 +1,6 @@
 import { db } from '../config/firebase';
 
+
 interface Client {
   id: string;
   first_name: string;
