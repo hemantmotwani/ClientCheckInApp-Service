@@ -1,8 +1,11 @@
 import { initializeApp, cert } from 'firebase-admin/app';
-import { getDatabase } from 'firebase-admin/database';
+// import { getDatabase } from 'firebase-admin/database';
+import { getFirestore } from 'firebase-admin/firestore'; // Use getFirestore
 import { getAuth } from 'firebase-admin/auth';
 import admin from 'firebase-admin';
 import * as dotenv from 'dotenv'
+import { App } from 'firebase-admin/app';
+
 dotenv.config();
 
 import firebaseAdmin from 'firebase-admin';
@@ -38,20 +41,25 @@ const serviceAccount = {
   databaseURL: process.env.FIREBASE_DATABASE_URL
 };
 
+let app: App; // Declare app variable
+
+
 // Log the project ID to verify it's being loaded
 console.log('Initializing Firebase with project ID:', process.env.FIREBASE_PROJECT_ID);
 if (!firebaseAdmin.apps.length) {
-  firebaseAdmin.initializeApp({
-    credential: firebaseAdmin.credential.cert(serviceAccount as any),
+  console.log('Initializing Firebase Admin SDK...');
+  app = firebaseAdmin.initializeApp({
+    credential: firebaseAdmin.credential.cert(serviceAccount as admin.ServiceAccount),
+    // databaseURL: process.env.FIREBASE_DATABASE_URL // Only if using Realtime DB
   });
+  console.log('Firebase Admin SDK initialized successfully.');
+} else {
+  console.log('Firebase Admin SDK already initialized.');
+  app = firebaseAdmin.app(); // Get the default app
 }
 
-// const app = initializeApp({
-//   credential: cert(serviceAccount as any),
-//   databaseURL: process.env.FIREBASE_DATABASE_URL
-// });
 
-console.log(' Firebase DB initialized');
-
-export const db = firebaseAdmin.firestore();
-// export const auth = getAuth(app); 
+console.log('Exporting Firebase services...');
+export const db = getFirestore(app); 
+export const auth = getAuth(app); 
+console.log('Firebase services (db, auth) ready for export.');
